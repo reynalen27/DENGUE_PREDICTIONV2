@@ -1,0 +1,274 @@
+/*
+ * DEWS design tokens
+ * ---------------------------------------------------------------------------
+ * Every colour below is a role, never a raw hex at the point of use.
+ *
+ * The categorical series slots were derived from the brand teal and validated
+ * with the dataviz six-checks validator (OKLab CVD separation, lightness band,
+ * chroma floor, normal-vision floor, contrast vs surface) in BOTH modes:
+ *
+ *   light  surface #FFFFFF  -> all checks pass, worst adjacent CVD dE 9.3
+ *   dark   surface #14181A  -> all checks pass, worst adjacent CVD dE 12.6
+ *
+ * The first three slots also pass under --pairs all in both modes, which is
+ * the cap for the model-comparison small multiples (3 models).
+ *
+ * Slots 4 (yellow) and 5 (magenta) sit below 3:1 on the light surface, so any
+ * chart reaching them must ship direct labels or a table view. Every chart in
+ * this app ships a table view regardless.
+ *
+ * Dark is *selected*, not flipped: the hues are re-stepped for the dark
+ * surface and re-validated as a set. The values are declared twice on purpose
+ * -- once behind the OS media query (so a JS-less load still honours the OS
+ * setting) and once behind the explicit [data-theme] stamp the in-app toggle
+ * writes, which must win in both directions.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Surfaces & planes -------------------------------------------- */
+  --plane:            #F4F5F2;  /* the page behind the cards */
+  --surface-1:        #FFFFFF;  /* card / chart surface */
+  --surface-2:        #FAFBF8;  /* nested panel, table head */
+  --surface-3:        #EEF0EA;  /* wells, track backgrounds */
+  --surface-inset:    #E8EBE4;
+  --surface-nav:      #0B2E28;  /* sidebar */
+  --surface-nav-2:    #0F3A32;
+
+  /* ---- Ink ----------------------------------------------------------- */
+  --ink-1:            #10201B;  /* primary text */
+  --ink-2:            #495A50;  /* secondary text */
+  --ink-3:            #6E7F74;  /* muted: axis ticks, captions */
+  --ink-on-nav:       #F2F7F4;
+  --ink-on-nav-2:     rgba(242, 247, 244, 0.64);
+  --ink-on-nav-3:     rgba(242, 247, 244, 0.40);
+  --ink-inverse:      #FFFFFF;
+
+  /* ---- Lines ---------------------------------------------------------- */
+  --line:             #DFE4DB;  /* hairline borders */
+  --line-strong:      #C6CFC3;  /* baseline / axis rule */
+  --line-grid:        #ECEFE9;  /* gridlines, one step off surface */
+  --line-nav:         rgba(242, 247, 244, 0.12);
+
+  /* ---- Brand / accent -------------------------------------------------- */
+  --accent:           #00887A;  /* = series slot 1; marks and thin strokes */
+  --accent-ink:       #00594F;  /* accent used as text on a light surface */
+  --accent-wash:      #E4F2EF;
+  --accent-wash-2:    #CFE7E2;
+  /* Filled surfaces need a darker step: white on #00887A is only 4.37:1,
+     while #037D6F clears 4.5:1. Marks keep --accent; buttons take this. */
+  --accent-solid:       #037D6F;
+  --accent-solid-hover: #026F64;
+  --accent-solid-press: #015C53;
+  --on-accent-solid:    #FFFFFF;
+
+  /* ---- Categorical series (validated order, assigned in sequence) ------ */
+  --series-1:         #00887A;  /* teal    - hybrid model / forecast */
+  --series-2:         #EB6834;  /* orange  - observed cases */
+  --series-3:         #2A78D6;  /* blue    - baseline */
+  --series-4:         #EDA100;  /* yellow  - relief required (<3:1) */
+  --series-5:         #E87BA4;  /* magenta - relief required (<3:1) */
+  --series-6:         #008300;  /* green */
+  --series-7:         #4A3AA7;  /* violet */
+  --series-8:         #E34948;  /* red */
+
+  /* ---- Status (fixed scale, never themed, always icon + label) --------- */
+  --status-good:      #0CA30C;
+  --status-warning:   #FAB219;
+  --status-serious:   #EC835A;
+  --status-critical:  #D03B3B;
+  /* Badge treatment: the pure status hue carries the dot; a darker same-hue
+     ink carries the text so it clears WCAG 4.5:1 against the wash. */
+  --status-good-ink:      #0A5C0A;
+  --status-good-wash:     #E6F5E6;
+  --status-warning-ink:   #6E4D08;
+  --status-warning-wash:  #FDF3DF;
+  --status-serious-ink:   #8A4120;
+  --status-serious-wash:  #FCEDE6;
+  --status-critical-ink:  #911F1E;
+  --status-critical-wash: #FAE7E7;
+
+  /* ---- Sequential ramp (single hue, light -> dark) --------------------- */
+  --seq-100: #D7EEEA;
+  --seq-200: #AFDDD7;
+  --seq-300: #7FC7BE;
+  --seq-400: #4EAEA3;
+  --seq-500: #00887A;
+  --seq-600: #026F64;
+  --seq-700: #01554D;
+
+  /* ---- Type ------------------------------------------------------------ */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --text-2xs:  11px;
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-md:   14px;
+  --text-base: 15px;
+  --text-lg:   17px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-hero: 52px;
+
+  /* ---- Space (4px base) ------------------------------------------------ */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ---- Radius ---------------------------------------------------------- */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  /* ---- Elevation ------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(16, 32, 27, 0.05);
+  --shadow-md: 0 1px 2px rgba(16, 32, 27, 0.05), 0 4px 12px rgba(16, 32, 27, 0.06);
+  --shadow-lg: 0 12px 32px rgba(16, 32, 27, 0.13), 0 2px 6px rgba(16, 32, 27, 0.07);
+  --ring: 0 0 0 3px var(--accent-wash-2);
+
+  /* ---- Layout ---------------------------------------------------------- */
+  --sidebar-w: 248px;
+  --content-max: 1400px;
+  --header-h: 60px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+
+    --plane:            #0B0E0F;
+    --surface-1:        #14181A;
+    --surface-2:        #1A1F21;
+    --surface-3:        #222829;
+    --surface-inset:    #0E1213;
+    --surface-nav:      #0C1112;
+    --surface-nav-2:    #141A1B;
+
+    --ink-1:            #F2F5F3;
+    --ink-2:            #ADBAB3;
+    --ink-3:            #87948C;
+    --ink-on-nav:       #F2F5F3;
+    --ink-on-nav-2:     rgba(242, 245, 243, 0.62);
+    --ink-on-nav-3:     rgba(242, 245, 243, 0.38);
+    --ink-inverse:      #06201C;
+
+    --line:             #262D2E;
+    --line-strong:      #39423F;
+    --line-grid:        #212829;
+    --line-nav:         rgba(242, 245, 243, 0.10);
+
+    --accent:           #1E9B85;
+    --accent-ink:       #4BC6AE;
+    --accent-wash:      rgba(30, 155, 133, 0.14);
+    --accent-wash-2:    rgba(30, 155, 133, 0.28);
+    --accent-solid:       #1E9B85;
+    --accent-solid-hover: #2FB39B;
+    --accent-solid-press: #46C4AC;
+    --on-accent-solid:    #06201C;
+
+    --series-1:         #1E9B85;
+    --series-2:         #D95926;
+    --series-3:         #3987E5;
+    --series-4:         #C98500;
+    --series-5:         #D55181;
+    --series-6:         #008300;
+    --series-7:         #9085E9;
+    --series-8:         #E66767;
+
+    --status-good-ink:      #55D655;
+    --status-good-wash:     rgba(12, 163, 12, 0.16);
+    --status-warning-ink:   #F7C455;
+    --status-warning-wash:  rgba(250, 178, 25, 0.16);
+    --status-serious-ink:   #F0A183;
+    --status-serious-wash:  rgba(236, 131, 90, 0.16);
+    --status-critical-ink:  #EF8080;
+    --status-critical-wash: rgba(208, 59, 59, 0.20);
+
+    --seq-100: #10312D;
+    --seq-200: #124840;
+    --seq-300: #135F54;
+    --seq-400: #17786A;
+    --seq-500: #1E9B85;
+    --seq-600: #3FB59E;
+    --seq-700: #6ACBB7;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.40), 0 4px 12px rgba(0, 0, 0, 0.34);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.40);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane:            #0B0E0F;
+  --surface-1:        #14181A;
+  --surface-2:        #1A1F21;
+  --surface-3:        #222829;
+  --surface-inset:    #0E1213;
+  --surface-nav:      #0C1112;
+  --surface-nav-2:    #141A1B;
+
+  --ink-1:            #F2F5F3;
+  --ink-2:            #ADBAB3;
+  --ink-3:            #87948C;
+  --ink-on-nav:       #F2F5F3;
+  --ink-on-nav-2:     rgba(242, 245, 243, 0.62);
+  --ink-on-nav-3:     rgba(242, 245, 243, 0.38);
+  --ink-inverse:      #06201C;
+
+  --line:             #262D2E;
+  --line-strong:      #39423F;
+  --line-grid:        #212829;
+  --line-nav:         rgba(242, 245, 243, 0.10);
+
+  --accent:           #1E9B85;
+  --accent-ink:       #4BC6AE;
+  --accent-wash:      rgba(30, 155, 133, 0.14);
+  --accent-wash-2:    rgba(30, 155, 133, 0.28);
+  --accent-solid:       #1E9B85;
+  --accent-solid-hover: #2FB39B;
+  --accent-solid-press: #46C4AC;
+  --on-accent-solid:    #06201C;
+
+  --series-1:         #1E9B85;
+  --series-2:         #D95926;
+  --series-3:         #3987E5;
+  --series-4:         #C98500;
+  --series-5:         #D55181;
+  --series-6:         #008300;
+  --series-7:         #9085E9;
+  --series-8:         #E66767;
+
+  --status-good-ink:      #55D655;
+  --status-good-wash:     rgba(12, 163, 12, 0.16);
+  --status-warning-ink:   #F7C455;
+  --status-warning-wash:  rgba(250, 178, 25, 0.16);
+  --status-serious-ink:   #F0A183;
+  --status-serious-wash:  rgba(236, 131, 90, 0.16);
+  --status-critical-ink:  #EF8080;
+  --status-critical-wash: rgba(208, 59, 59, 0.20);
+
+  --seq-100: #10312D;
+  --seq-200: #124840;
+  --seq-300: #135F54;
+  --seq-400: #17786A;
+  --seq-500: #1E9B85;
+  --seq-600: #3FB59E;
+  --seq-700: #6ACBB7;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.40), 0 4px 12px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.40);
+}

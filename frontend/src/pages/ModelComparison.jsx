@@ -1,0 +1,234 @@
+import { useMemo, useState } from 'react'
+import { useFetch } from '../hooks/useFetch.js'
+import { modelsApi } from '../services/api.js'
+import { Card, CardBody, CardFoot, CardHead } from '../components/Card.jsx'
+import { LegendItem, PageHeader, ViewToggle } from '../components/Controls.jsx'
+import { AsyncSection, EmptyState, SkeletonRows } from '../components/States.jsx'
+import DataTable from '../components/DataTable.jsx'
+import Icon from '../components/Icon.jsx'
+import { seriesSlots, useChartTheme } from '../lib/useChartTheme.js'
+import { formatDateTime, formatNumber, toNumber } from '../lib/format.js'
+
+/*
+ * Five metrics on five different scales (cases, %, CRPS). Putting any two of
+ * them on one plot would need a second y-axis, which invents a relationship
+ * that isn't in the data -- so this is small multiples instead: one chart per
+ * metric, each with its own scale, the three models keeping their colour
+ * across all five.
+ */
+const METRICS = [
+  { key: 'rmse', name: 'RMSE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Root mean squared error, in cases.' },
+  { key: 'mae', name: 'MAE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Mean absolute error, in cases.' },
+  { key: 'mape', name: 'MAPE', goal: 'lower is better', decimals: 2, unit: '%', blurb: 'Mean absolute percentage error.' },
+  { key: 'crps', name: 'CRPS', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Continuous ranked probability score — scores the whole predictive distribution, not just the point estimate.' },
+  { key: 'coverage', name: 'Interval coverage', goal: 'higher is better', decimals: 1, unit: '%', blurb: 'Share of observations that fell inside the model’s stated interval.' },
+]
+
+function bestIdFor(metric, runs) {
+  const scored = runs
+    .map((r) => ({ id: r.id, value: toNumber(r[metric.key]) }))
+    .filter((r) => r.value !== null)
+  if (!scored.length) return null
+  const higherWins = metric.goal.startsWith('higher')
+  return scored.reduce((best, r) => {
+    if (!best) return r
+    return (higherWins ? r.value > best.value : r.value < best.value) ? r : best
+  }, null).id
+}
+
+function MetricChart({ metric, runs, colorFor }) {
+  const values = runs.map((r) => toNumber(r[metric.key])).filter((v) => v !== null)
+  const max = values.length ? Math.max(...values) : 0
+  const bestId = bestIdFor(metric, runs)
+
+  return (
+    <Card>
+      <CardBody>
+        <div className="metric-card-head">
+          <span className="metric-name">{metric.name}</span>
+          <span className="metric-goal">{metric.goal}</span>
+        </div>
+
+        <div className="bars">
+          {runs.map((run) => {
+            const value = toNumber(run[metric.key])
+            const pct = value !== null && max > 0 ? Math.max((value / max) * 100, 2) : 0
+            return (
+              <div className="bar-row" key={run.id}>
+                <div className="bar-row-head">
+                  <span className="key-swatch" style={{ background: colorFor(run.id) }} />
+                  <span className="bar-row-name">{run.model_type}</span>
+                  {/* Direct label at the data end -- value, not a number on every tick. */}
+                  <span className="bar-row-value">
+                    {value === null ? '—' : formatNumber(value, { decimals: metric.decimals, unit: metric.unit })}
+                    {run.id === bestId && (
+                      <>
+                        {' '}
+                        <Icon name="check" size={11} strokeWidth={2.6} style={{ verticalAlign: -1, color: 'var(--accent-ink)' }} />
+                        <span className="sr-only"> best on this metric</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{ width: `${pct}%`, background: colorFor(run.id) }}
+                    role="img"
+                    aria-label={`${run.model_type}: ${value === null ? 'no value' : formatNumber(value, { decimals: metric.decimals, unit: metric.unit })}`}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardBody>
+      <CardFoot>{metric.blurb}</CardFoot>
+    </Card>
+  )
+}
+
+export default function ModelComparison() {
+  const t = useChartTheme()
+  const [view, setView] = useState('chart')
+  const { data: runs, loading, error, refetch } = useFetch(() => modelsApi.compare(), [])
+
+  const list = runs ?? []
+
+  /*
+   * Colour follows the entity, never its rank. The hybrid is pinned to slot 1
+   * because it is the subject of the study, not because it happens to be
+   * winning; the baselines then take the remaining slots in stable id order.
+   * Nothing here depends on the current sort, so filtering or re-sorting can
+   * never repaint a model the reader has already learned.
+   */
+  const modelOrder = useMemo(() => {
+    const byId = [...list].sort((a, b) => a.id - b.id)
+    const isHybrid = (r) => /hybrid/i.test(r.model_type)
+    return [...byId.filter(isHybrid), ...byId.filter((r) => !isHybrid(r))].map((r) => r.id)
+  }, [list])
+
+  const colorFor = useMemo(() => {
+    const slots = seriesSlots(t)
+    return (id) => slots[modelOrder.indexOf(id) % slots.length]
+  }, [modelOrder, t])
+
+  const best = list[0]
+  const runnerUp = list[1]
+  const rmseGain = best && runnerUp
+    ? ((toNumber(runnerUp.rmse) - toNumber(best.rmse)) / toNumber(runnerUp.rmse)) * 100
+    : null
+
+  const bestPerMetric = useMemo(
+    () => Object.fromEntries(METRICS.map((m) => [m.key, bestIdFor(m, list)])),
+    [list],
+  )
+
+  return (
+    <>
+      <PageHeader
+        title="Model comparison"
+        description="Comparative evaluation of the Bayesian-neural hybrid against the SARIMA and LSTM baselines, on the held-out evaluation window."
+        actions={<ViewToggle view={view} onChange={setView} label="Comparison view" />}
+      />
+
+      <AsyncSection
+        loading={loading}
+        error={error}
+        hasData={list.length > 0}
+        isEmpty={Boolean(runs) && list.length === 0}
+        onRetry={refetch}
+        errorTitle="Could not load evaluation results"
+        skeleton={<Card><SkeletonRows rows={5} /></Card>}
+        empty={(
+          <Card>
+            <EmptyState
+              icon="models"
+              title="No evaluation runs recorded"
+              body="Each model run needs a matching row in evaluation_metrics. Run npm run seed in the backend for the sample comparison, or let the Python model service write real results."
+            />
+          </Card>
+        )}
+      >
+        {best && (
+          <Card>
+            <CardBody>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 'var(--sp-3)' }}>
+                <span className="badge badge-accent">
+                  <span className="badge-dot" />
+                  Leading model
+                </span>
+                <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>{best.model_type}</span>
+                <span className="tag">{best.version}</span>
+                <span className="muted" style={{ fontSize: 'var(--text-xs)', marginLeft: 'auto' }}>
+                  Trained {formatDateTime(best.trained_at)}
+                </span>
+              </div>
+              <p className="subtle" style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--text-sm)', maxWidth: '80ch' }}>
+                {rmseGain === null
+                  ? `${best.model_type} is the only evaluated run, so there is nothing to compare it against yet.`
+                  : `${best.model_type} cuts RMSE by ${rmseGain.toFixed(1)}% against ${runnerUp.model_type}, and reports ${formatNumber(best.coverage, { decimals: 1 })}% interval coverage — the property the baselines do not provide.`}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {view === 'chart' ? (
+          <>
+            <div className="legend section-gap" style={{ paddingBottom: 0 }}>
+              {modelOrder.map((id) => {
+                const run = list.find((r) => r.id === id)
+                return <LegendItem key={id} shape="swatch" color={colorFor(id)} label={run.model_type} />
+              })}
+            </div>
+            <div className="grid grid-3 section-gap">
+              {METRICS.map((metric) => (
+                <MetricChart key={metric.key} metric={metric} runs={list} colorFor={colorFor} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <Card className="section-gap">
+            <CardHead
+              title="Evaluation metrics"
+              description="The same numbers as the charts. “Best” marks the winning model on each metric."
+            />
+            <DataTable
+              caption="Model evaluation metrics"
+              rows={list}
+              getRowKey={(row) => row.id}
+              columns={[
+                {
+                  key: 'model_type',
+                  header: 'Model',
+                  className: 'cell-strong',
+                  render: (r) => (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span className="key-swatch" style={{ background: colorFor(r.id) }} />
+                      {r.model_type}
+                    </span>
+                  ),
+                },
+                { key: 'version', header: 'Version', render: (r) => <span className="mono cell-quiet">{r.version ?? '—'}</span> },
+                ...METRICS.map((m) => ({
+                  key: m.key,
+                  header: `${m.name}${m.unit ? ` (${m.unit})` : ''}`,
+                  align: 'right',
+                  render: (r) => {
+                    const text = formatNumber(r[m.key], { decimals: m.decimals })
+                    return bestPerMetric[m.key] === r.id
+                      ? <span className="cell-best">{text}</span>
+                      : text
+                  },
+                })),
+              ]}
+            />
+            <CardFoot>
+              RMSE, MAE, MAPE and CRPS are lower-is-better; interval coverage is higher-is-better.
+            </CardFoot>
+          </Card>
+        )}
+      </AsyncSection>
+    </>
+  )
+}

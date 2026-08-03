@@ -1,0 +1,38 @@
+import { Routes, Route, Link } from 'react-router-dom'
+import Layout from './components/Layout.jsx'
+import { Card } from './components/Card.jsx'
+import { EmptyState } from './components/States.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import DataManagement from './pages/DataManagement.jsx'
+import Forecast from './pages/Forecast.jsx'
+import ModelComparison from './pages/ModelComparison.jsx'
+import Alerts from './pages/Alerts.jsx'
+import RiskMap from './pages/RiskMap.jsx'
+
+export default function App() {
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/forecast" element={<Forecast />} />
+        <Route path="/models" element={<ModelComparison />} />
+        <Route path="/data" element={<DataManagement />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/map" element={<RiskMap />} />
+        <Route
+          path="*"
+          element={(
+            <Card>
+              <EmptyState
+                icon="inbox"
+                title="Page not found"
+                body="That route isn't part of the app."
+                actions={<Link className="btn btn-primary btn-sm" to="/">Back to the dashboard</Link>}
+              />
+            </Card>
+          )}
+        />
+      </Routes>
+    </Layout>
+  )
+}

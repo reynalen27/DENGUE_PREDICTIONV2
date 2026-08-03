@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "eslint.workingDirectories": ["frontend", "backend"],
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "files.associations": {
+    "*.env.example": "dotenv"
+  }
+}

@@ -1,0 +1,23 @@
+### List regions
+GET http://localhost:4000/api/regions
+
+### List case data
+GET http://localhost:4000/api/cases
+
+### Get predictions for region 1 (hybrid model's latest run)
+GET http://localhost:4000/api/predictions/1
+
+### Compare models (hybrid vs baselines)
+GET http://localhost:4000/api/models/compare
+
+### List alerts
+GET http://localhost:4000/api/alerts
+
+### Login (seeded demo user)
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@dews.local",
+  "password": "password123"
+}
