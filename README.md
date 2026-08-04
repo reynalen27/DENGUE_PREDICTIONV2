@@ -19,6 +19,7 @@ cd backend
 cp .env.example .env   # fill in your MySQL credentials
 npm install
 npm run migrate        # creates all tables from migrations/schema.sql
+import dengueDB.sql from your local MySQL database
 ```
 
 ## 2. Backend API
