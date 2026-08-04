@@ -21,6 +21,7 @@ const NAV = [
     items: [
       { to: '/forecast', label: 'Forecast', icon: 'forecast' },
       { to: '/models', label: 'Model comparison', icon: 'models' },
+      { to: '/methodology', label: 'Model mathematics', icon: 'sigma' },
     ],
   },
   {
@@ -35,6 +36,7 @@ const TITLES = {
   '/alerts': 'Alerts',
   '/forecast': 'Forecast',
   '/models': 'Model comparison',
+  '/methodology': 'Model mathematics',
   '/data': 'Data management',
 }
 

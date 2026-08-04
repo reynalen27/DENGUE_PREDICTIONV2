@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import DataManagement from './pages/DataManagement.jsx'
 import Forecast from './pages/Forecast.jsx'
 import ModelComparison from './pages/ModelComparison.jsx'
+import Methodology from './pages/Methodology.jsx'
 import Alerts from './pages/Alerts.jsx'
 import RiskMap from './pages/RiskMap.jsx'
 
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/forecast" element={<Forecast />} />
         <Route path="/models" element={<ModelComparison />} />
+        <Route path="/methodology" element={<Methodology />} />
         <Route path="/data" element={<DataManagement />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/map" element={<RiskMap />} />

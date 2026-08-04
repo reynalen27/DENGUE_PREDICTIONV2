@@ -8,6 +8,7 @@ const PATHS = {
   dashboard: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>,
   forecast: <><path d="M3 17.5 8 11l4 3.5L21 5" /><path d="M16 5h5v5" /></>,
   models: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+  sigma: <><path d="M18 5.5V4H6.5l6 8-6 8H18v-1.5" /></>,
   data: <><ellipse cx="12" cy="5.5" rx="8" ry="3" /><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" /><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" /></>,
   alerts: <><path d="M12 3a6 6 0 0 0-6 6c0 4-2 5-2 5h16s-2-1-2-5a6 6 0 0 0-6-6Z" /><path d="M10.5 20a2 2 0 0 0 3 0" /></>,
   upload: <><path d="M12 15V3" /><path d="m7.5 7.5 4.5-4.5 4.5 4.5" /><path d="M3 15v3.5A2.5 2.5 0 0 0 5.5 21h13a2.5 2.5 0 0 0 2.5-2.5V15" /></>,

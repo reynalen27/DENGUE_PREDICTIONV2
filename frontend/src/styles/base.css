@@ -8,6 +8,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* In-page anchors (the modelling reference's contents list) glide rather
+     than jump. The reduced-motion block below overrides this. */
+  scroll-behavior: smooth;
 }
 
 body {
