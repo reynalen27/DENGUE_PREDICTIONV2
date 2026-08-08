@@ -23,7 +23,11 @@ const NAV = [
       { to: '/models', label: 'Model comparison', icon: 'models' },
       { to: '/calibration', label: 'Calibration', icon: 'target' },
       { to: '/drivers', label: 'Drivers', icon: 'chart' },
+      // Two maths pages arrived independently and overlap in subject. Both are
+      // kept and routed so neither is lost; collapse them into one once it is
+      // decided which framing to keep.
       { to: '/mathematics', label: 'Mathematical calculation', icon: 'sigma' },
+      { to: '/methodology', label: 'Model mathematics', icon: 'sigma' },
     ],
   },
   {
@@ -41,6 +45,7 @@ const TITLES = {
   '/calibration': 'Calibration',
   '/drivers': 'Drivers',
   '/mathematics': 'Mathematical calculation',
+  '/methodology': 'Model mathematics',
   '/data': 'Data management',
 }
 
