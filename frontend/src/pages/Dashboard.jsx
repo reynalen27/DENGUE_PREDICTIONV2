@@ -37,7 +37,7 @@ export default function Dashboard() {
   const { data: alerts, loading: alertsLoading, error: alertsError, refetch: refetchAlerts } =
     useFetch(() => alertsApi.list(), [])
   const { data: runs, loading: runsLoading } = useFetch(() => modelsApi.compare(), [])
-  const { data: regions } = useFetch(() => regionsApi.list(), [])
+  const { data: regions } = useFetch(() => regionsApi.list('municipality'), [])
   const { data: cases } = useFetch(() => casesApi.list(), [])
 
   const riskByRegion = useMemo(() => currentRiskByRegion(alerts), [alerts])

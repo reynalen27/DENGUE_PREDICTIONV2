@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useFetch } from '../hooks/useFetch.js'
-import { surveillanceApi } from '../services/api.js'
+import { panelApi, surveillanceApi } from '../services/api.js'
 import { Card, CardBody, CardFoot, CardHead } from '../components/Card.jsx'
 import { PageHeader, Select, ViewToggle } from '../components/Controls.jsx'
 import { AsyncSection, EmptyState, SkeletonBlock } from '../components/States.jsx'
@@ -30,12 +30,34 @@ const METRICS = {
   },
 }
 
-/** The boundary file is a committed static asset — no tile server, no API key. */
-function useBoundaries() {
+/*
+ * Two scopes, two committed boundary files. Both are static assets built once
+ * by backend/scripts/build-boundaries.js — no tile server, no API key, no
+ * request to anything but this app's own origin.
+ */
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+const SCOPES = {
+  region: {
+    label: 'Philippine regions',
+    file: 'ph-regions.geojson',
+    grain: '17 administrative regions, monthly',
+    note: 'The study panel. 2016-2020, the window the model is trained and scored on.',
+  },
+  municipality: {
+    label: 'CALABARZON municipalities',
+    file: 'calabarzon-lgus.geojson',
+    grain: '142 cities and municipalities, annual',
+    note: 'Finer geography, but annual totals only — it cannot support the forecast model.',
+  },
+}
+
+function useBoundaries(scope) {
   const [state, setState] = useState({ data: null, error: null, loading: true })
   useEffect(() => {
     let alive = true
-    fetch(`${import.meta.env.BASE_URL}calabarzon-lgus.geojson`)
+    setState((prev) => ({ ...prev, loading: true }))
+    fetch(`${import.meta.env.BASE_URL}${SCOPES[scope].file}`)
       .then((r) => {
         if (!r.ok) throw new Error(`Boundary file returned HTTP ${r.status}`)
         return r.json()
@@ -43,54 +65,132 @@ function useBoundaries() {
       .then((data) => alive && setState({ data, error: null, loading: false }))
       .catch((error) => alive && setState({ data: null, error, loading: false }))
     return () => { alive = false }
-  }, [])
+  }, [scope])
   return state
 }
 
 export default function RiskMap() {
+  const [scope, setScope] = useState('region')
   const [metricKey, setMetricKey] = useState('incidence')
   const [year, setYear] = useState(null)
+  const [month, setMonth] = useState('all')
   const [view, setView] = useState('chart')
 
-  const { data: rows, loading, error, refetch } = useFetch(() => surveillanceApi.annual(), [])
-  const { data: geo, error: geoError, loading: geoLoading } = useBoundaries()
+  // Both sources are fetched; the inactive one costs one request and makes
+  // switching scope instant instead of a spinner.
+  const { data: annual, loading: annualLoading, error: annualError, refetch } =
+    useFetch(() => surveillanceApi.annual(), [])
+  const { data: panel, loading: panelLoading, error: panelError } =
+    useFetch(() => panelApi.get(), [])
+  const { data: geo, error: geoError, loading: geoLoading } = useBoundaries(scope)
 
   const metric = METRICS[metricKey]
-  const records = rows ?? []
+  const isRegion = scope === 'region'
+
+  const loading = isRegion ? panelLoading : annualLoading
+  const error = isRegion ? panelError : annualError
+
+  /*
+   * Both scopes are normalised to one row shape so everything downstream --
+   * bins, stats, table, tooltip -- is written once:
+   *
+   *   { key, name, sublabel, year, month, confirmed_cases, deaths, population }
+   *
+   * `key` is what a map feature is matched on: the region slug for the
+   * national layer, name::province for the municipal one (name alone is not
+   * unique -- there are two Rosarios).
+   */
+  const records = useMemo(() => {
+    if (isRegion) {
+      return (panel ?? []).map((r) => ({
+        key: r.region_slug,
+        name: r.region_name,
+        sublabel: r.region_slug,
+        year: r.year,
+        month: r.month,
+        confirmed_cases: toNumber(r.confirmed_cases),
+        deaths: toNumber(r.deaths),
+        population: toNumber(r.population),
+      }))
+    }
+    return (annual ?? []).map((r) => ({
+      key: `${r.region_name}::${String(r.province).toUpperCase()}`,
+      name: r.region_name,
+      sublabel: r.province,
+      year: r.year,
+      month: null,
+      confirmed_cases: toNumber(r.confirmed_cases),
+      deaths: toNumber(r.deaths),
+      population: toNumber(r.population),
+    }))
+  }, [isRegion, panel, annual])
 
   const years = useMemo(
     () => [...new Set(records.map((r) => r.year))].sort((a, b) => b - a),
     [records],
   )
-  const activeYear = year ?? years[0] ?? null
+  const activeYear = years.includes(year) ? year : (years[0] ?? null)
+  const activeMonth = isRegion ? month : 'all'
 
   /*
-   * Bins are computed across EVERY year, not just the one on screen, so the
-   * scale holds still while the reader steps through years. Recomputing per
-   * year would repaint the whole map on every change and hide the growth
-   * that is the entire point of stepping through it.
+   * Collapse to one row per place for the selected period. For the regional
+   * scope "all" sums the twelve months, which is what makes the two scopes
+   * comparable; population is a yearly figure so it is taken, not summed.
    */
-  const bins = useMemo(() => makeBins(records.map(metric.of)), [records, metric])
-
-  const byKey = useMemo(() => {
-    const m = new Map()
-    for (const r of records) {
-      if (r.year !== activeYear) continue
-      m.set(`${r.region_name}::${r.province}`, r)
+  const periodRows = useMemo(() => {
+    const wanted = records.filter((r) => r.year === activeYear
+      && (activeMonth === 'all' || r.month === Number(activeMonth)))
+    const byPlace = new Map()
+    for (const r of wanted) {
+      const cur = byPlace.get(r.key)
+      if (!cur) byPlace.set(r.key, { ...r })
+      else {
+        cur.confirmed_cases += r.confirmed_cases ?? 0
+        cur.deaths += r.deaths ?? 0
+      }
     }
-    return m
-  }, [records, activeYear])
+    return [...byPlace.values()]
+  }, [records, activeYear, activeMonth])
 
-  const lookup = (feature) => byKey.get(`${feature.properties.name}::${feature.properties.province.toUpperCase()}`) ?? null
+  /*
+   * Bins are computed across EVERY period in the scope, not just the one on
+   * screen, so the scale holds still while the reader steps through time.
+   * Recomputing per period would repaint the map on every change and hide the
+   * growth that is the entire point of stepping through it.
+   */
+  const bins = useMemo(() => {
+    const byPeriod = new Map()
+    for (const r of records) {
+      const k = `${r.key}|${r.year}|${activeMonth === 'all' ? 'y' : r.month}`
+      const cur = byPeriod.get(k)
+      if (!cur) byPeriod.set(k, { ...r })
+      else {
+        cur.confirmed_cases += r.confirmed_cases ?? 0
+        cur.deaths += r.deaths ?? 0
+      }
+    }
+    return makeBins([...byPeriod.values()].map(metric.of))
+  }, [records, metric, activeMonth])
+
+  const byKey = useMemo(
+    () => new Map(periodRows.map((r) => [r.key, r])),
+    [periodRows],
+  )
+
+  const lookup = (feature) => byKey.get(
+    isRegion
+      ? feature.properties.slug
+      : `${feature.properties.name}::${String(feature.properties.province).toUpperCase()}`,
+  ) ?? null
+
   const valueOf = (feature) => {
     const row = lookup(feature)
     return row ? metric.of(row) : null
   }
 
-  const yearRows = records.filter((r) => r.year === activeYear)
-  const total = yearRows.reduce((s, r) => s + (toNumber(r.confirmed_cases) ?? 0), 0)
-  const deaths = yearRows.reduce((s, r) => s + (toNumber(r.deaths) ?? 0), 0)
-  const worst = yearRows.reduce((best, r) => {
+  const total = periodRows.reduce((s, r) => s + (r.confirmed_cases ?? 0), 0)
+  const deaths = periodRows.reduce((s, r) => s + (r.deaths ?? 0), 0)
+  const worst = periodRows.reduce((best, r) => {
     const v = metric.of(r)
     if (v === null) return best
     return !best || v > metric.of(best) ? r : best
@@ -98,21 +198,31 @@ export default function RiskMap() {
   const noData = geo ? geo.features.some((f) => valueOf(f) === null) : false
 
   const tableRows = useMemo(
-    () => [...yearRows].sort((a, b) => (metric.of(b) ?? -1) - (metric.of(a) ?? -1)),
-    [yearRows, metric],
+    () => [...periodRows].sort((a, b) => (metric.of(b) ?? -1) - (metric.of(a) ?? -1)),
+    [periodRows, metric],
   )
 
-  const ready = Boolean(geo && records.length)
+  const ready = Boolean(geo && periodRows.length)
 
   return (
     <>
       <PageHeader
         title="Risk map"
-        description="Confirmed dengue cases by city and municipality across CALABARZON, from the DOH annual surveillance tables."
+        description={isRegion
+          ? 'Confirmed dengue cases across the 17 administrative regions — the study panel, monthly, 2016-2020.'
+          : 'Confirmed dengue cases by city and municipality across CALABARZON, from the DOH annual surveillance tables.'}
       />
 
       <div className="filter-bar">
-        <span className="filter-bar-label">Year</span>
+        <span className="filter-bar-label">Scope</span>
+        <Select
+          label="Scope"
+          hideLabel
+          value={scope}
+          onChange={(v) => { setScope(v); setYear(null); setMonth('all') }}
+          options={Object.entries(SCOPES).map(([k, v]) => ({ value: k, label: v.label }))}
+        />
+        <span className="filter-bar-label" style={{ marginLeft: 'var(--sp-2)' }}>Year</span>
         <Select
           label="Year"
           hideLabel
@@ -121,6 +231,21 @@ export default function RiskMap() {
           options={years.map((y) => ({ value: y, label: String(y) }))}
           disabled={!years.length}
         />
+        {isRegion && (
+          <>
+            <span className="filter-bar-label" style={{ marginLeft: 'var(--sp-2)' }}>Month</span>
+            <Select
+              label="Month"
+              hideLabel
+              value={month}
+              onChange={setMonth}
+              options={[
+                { value: 'all', label: 'All months (annual)' },
+                ...MONTH_NAMES.map((m, i) => ({ value: String(i + 1), label: m })),
+              ]}
+            />
+          </>
+        )}
         <span className="filter-bar-label" style={{ marginLeft: 'var(--sp-2)' }}>Metric</span>
         <Select
           label="Metric"
@@ -135,9 +260,9 @@ export default function RiskMap() {
 
       <div className="grid grid-4">
         <StatCard
-          label={`Confirmed cases, ${activeYear ?? '—'}`}
+          label={`Confirmed cases, ${activeMonth === 'all' ? activeYear ?? '—' : `${MONTH_NAMES[Number(activeMonth) - 1]} ${activeYear}`}`}
           value={formatInt(total)}
-          sublabel="Across all 142 cities and municipalities"
+          sublabel={isRegion ? 'Across all 17 administrative regions' : 'Across all 142 cities and municipalities'}
           loading={loading && !records.length}
         />
         <StatCard
@@ -149,13 +274,13 @@ export default function RiskMap() {
         <StatCard
           label={`Highest ${metric.short}`}
           value={worst ? metric.format(metric.of(worst)) : '—'}
-          sublabel={worst ? `${worst.region_name}, ${worst.province}` : '—'}
+          sublabel={worst ? `${worst.name}${worst.sublabel && !isRegion ? `, ${worst.sublabel}` : ''}` : '—'}
           loading={loading && !records.length}
         />
         <StatCard
-          label="Municipalities mapped"
+          label={isRegion ? 'Regions mapped' : 'Municipalities mapped'}
           value={geo ? formatInt(geo.features.length) : '—'}
-          sublabel="Boundaries matched to the PSA gazetteer"
+          sublabel={isRegion ? 'geoBoundaries ADM1, all 17 matched' : 'Boundaries matched to the PSA gazetteer'}
           loading={geoLoading}
         />
       </div>
@@ -163,17 +288,17 @@ export default function RiskMap() {
       <div className={view === 'chart' ? 'grid grid-map section-gap' : 'section-gap'}>
       <Card>
         <CardHead
-          title={`${metric.label} — ${activeYear ?? ''}`}
+          title={`${metric.label} — ${activeMonth === 'all' ? activeYear ?? '' : `${MONTH_NAMES[Number(activeMonth) - 1]} ${activeYear}`}`}
           // The ramp anchors to the surface, so "darker = higher" is only true
           // in light mode. This wording holds in both.
-          description="Low values sit closest to the background, high values stand furthest from it. Bins are fixed across all five years, so stepping through them shows real change."
+          description={`${SCOPES[scope].grain}. Low values sit closest to the background, high values stand furthest from it. Bins are fixed across every period, so stepping through time shows real change.`}
         />
 
         <AsyncSection
           loading={loading || geoLoading}
           error={error ?? geoError}
           hasData={ready}
-          isEmpty={Boolean(rows) && records.length === 0}
+          isEmpty={!loading && periodRows.length === 0}
           onRetry={refetch}
           errorTitle="Could not load the map"
           skeleton={<SkeletonBlock height={420} />}
@@ -181,7 +306,9 @@ export default function RiskMap() {
             <EmptyState
               icon="data"
               title="No surveillance data loaded"
-              body="Run npm run etl in the backend to import the CALABARZON research dataset."
+              body={isRegion
+                ? 'Run npm run etl:revised in the backend to import the study panel.'
+                : 'Run npm run etl in the backend to import the CALABARZON research dataset.'}
             />
           )}
         >
@@ -200,14 +327,14 @@ export default function RiskMap() {
                   bins={bins}
                   valueOf={valueOf}
                   formatValue={metric.format}
-                  height={520}
+                  height={isRegion ? 700 : 520}
                   ariaLabel={`Choropleth of ${metric.label} by municipality in CALABARZON, ${activeYear}. Values are listed in the table view.`}
                   renderTooltip={(feature) => {
                     const row = lookup(feature)
                     return (
                       <>
                         <p className="map-tip-name">{feature.properties.name}</p>
-                        <p className="map-tip-sub">{feature.properties.province}</p>
+                        <p className="map-tip-sub">{feature.properties.province ?? feature.properties.slug}</p>
                         <div className="map-tip-row">
                           <span>Cases</span>
                           <span className="map-tip-value">{row ? formatInt(row.confirmed_cases) : 'No data'}</span>
@@ -230,12 +357,12 @@ export default function RiskMap() {
             </CardBody>
           ) : (
             <DataTable
-              caption={`${metric.label} by municipality, ${activeYear}`}
+              caption={`${metric.label} by ${isRegion ? 'region' : 'municipality'}, ${activeYear}`}
               rows={tableRows}
-              getRowKey={(r) => `${r.region_id}-${r.year}`}
+              getRowKey={(r) => `${r.key}-${r.year}-${r.month ?? 'y'}`}
               columns={[
-                { key: 'region_name', header: 'Municipality', className: 'cell-strong' },
-                { key: 'province', header: 'Province', render: (r) => <span className="cell-quiet">{r.province}</span> },
+                { key: 'name', header: isRegion ? 'Region' : 'Municipality', className: 'cell-strong' },
+                { key: 'sublabel', header: isRegion ? 'Code' : 'Province', render: (r) => <span className="cell-quiet">{r.sublabel}</span> },
                 { key: 'confirmed_cases', header: 'Cases', align: 'right', render: (r) => formatInt(r.confirmed_cases) },
                 { key: 'deaths', header: 'Deaths', align: 'right', render: (r) => (toNumber(r.deaths) ? formatInt(r.deaths) : <span className="cell-quiet">0</span>) },
                 { key: 'population', header: 'Population 2020', align: 'right', render: (r) => formatInt(r.population) },
@@ -252,12 +379,26 @@ export default function RiskMap() {
         </AsyncSection>
 
         <CardFoot>
-          Cases: DOH Center for Health Development – CALABARZON annual surveillance tables, 2020–2024.
-          Population: PSA 2020 Census. Boundaries:{' '}
-          <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>{' '}
-          gbOpen PHL ADM3 (2020), CC-BY 4.0 — bundled as a static file, so this map makes no
-          external requests. These are <strong>annual</strong> totals, not a forecast; see
-          DATA_ASSESSMENT.md for why weekly counts are needed before the model can run.
+          {isRegion ? (
+            <>
+              Cases: DOH monthly regional surveillance, 2016–2020 (1,020 region-months).
+              Population: PSA 2015/2020 census, interpolated between them. Boundaries:{' '}
+              <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>{' '}
+              gbOpen PHL ADM1 (2020), CC-BY 4.0. This is the panel the model is trained and
+              scored on. 2020 is shown but excluded from headline evaluation — the COVID
+              lockdown collapsed surveillance reporting, not transmission.
+            </>
+          ) : (
+            <>
+              Cases: DOH Center for Health Development – CALABARZON annual surveillance tables,
+              2020–2024. Population: PSA 2020 Census. Boundaries:{' '}
+              <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>{' '}
+              gbOpen PHL ADM3 (2020), CC-BY 4.0. These are <strong>annual</strong> totals at a
+              finer geography than the study panel — useful context, but they cannot support the
+              forecast model.
+            </>
+          )}{' '}
+          Both boundary files are bundled as static assets, so this map makes no external requests.
         </CardFoot>
       </Card>
 
@@ -265,7 +406,7 @@ export default function RiskMap() {
         <Card>
           <CardHead
             title={`Highest ${metric.short}`}
-            description={`Top 12 of 142 municipalities, ${activeYear ?? ''}.`}
+            description={`Top ${Math.min(12, tableRows.length)} of ${tableRows.length} ${isRegion ? 'regions' : 'municipalities'}.`}
           />
           <AsyncSection
             loading={loading}
@@ -279,11 +420,11 @@ export default function RiskMap() {
                 const v = metric.of(r)
                 const top = metric.of(tableRows[0]) || 1
                 return (
-                  <div className="rank-row" key={`${r.region_id}-${r.year}`}>
+                  <div className="rank-row" key={`${r.key}-${r.year}-${r.month ?? 'y'}`}>
                     <span className="rank-index">{i + 1}</span>
                     <span className="rank-body">
                       <span className="rank-head">
-                        <span className="rank-name">{r.region_name}</span>
+                        <span className="rank-name">{r.name}</span>
                         <span className="rank-value">{metric.format(v)}</span>
                       </span>
                       <span className="bar-track" style={{ height: 6 }}>
@@ -292,7 +433,7 @@ export default function RiskMap() {
                           style={{ height: 6, width: `${Math.max(((v ?? 0) / top) * 100, 2)}%`, background: 'var(--seq-500)' }}
                         />
                       </span>
-                      <span className="rank-meta">{r.province}</span>
+                      <span className="rank-meta">{r.sublabel}</span>
                     </span>
                   </div>
                 )
@@ -300,8 +441,10 @@ export default function RiskMap() {
             </div>
           </AsyncSection>
           <CardFoot>
-            Ranked on the selected metric. Small municipalities dominate the per-100k view —
-            that is real, not an artefact: a low denominator makes incidence volatile.
+            Ranked on the selected metric.{' '}
+            {isRegion
+              ? 'Regions have large, stable denominators, so per-100k here is a fair comparison.'
+              : 'Small municipalities dominate the per-100k view — that is real, not an artefact: a low denominator makes incidence volatile.'}
           </CardFoot>
         </Card>
       )}

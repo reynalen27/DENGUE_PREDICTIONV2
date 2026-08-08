@@ -4,10 +4,17 @@ Frontend: React + Vite. Backend: plain Node.js `http` server (no Express) + MySQ
 The Bayesian-neural hybrid model itself runs as a separate Python service that writes
 `predictions` and `evaluation_metrics` rows into MySQL; this app reads and displays them.
 
-**Docs:**
-- [ARCHITECTURE.md](ARCHITECTURE.md) — how the system fits together, what every
-  folder does, and a step-by-step run guide
-- [VSCODE_SETUP_GUIDE.md](VSCODE_SETUP_GUIDE.md) — guided first run inside VS Code
+**Docs** (all in [`markdown/`](markdown/)):
+- [ARCHITECTURE.md](markdown/ARCHITECTURE.md) — the study objective, how the
+  system fits together, what every folder does, and a step-by-step run guide
+- [MODEL_SERVICE.md](markdown/MODEL_SERVICE.md) — write contract for the Python
+  model service: what to insert, in what order, with example SQL
+- [REVISION_PLAN.md](markdown/REVISION_PLAN.md) — the schema, backend and
+  frontend changes needed to answer the finalised objective
+- [DATA_ASSESSMENT.md](markdown/DATA_ASSESSMENT.md) — field-level audit of the
+  source data
+- [VSCODE_SETUP_GUIDE.md](markdown/VSCODE_SETUP_GUIDE.md) — guided first run
+  inside VS Code
 
 The quick reference below assumes you already know the stack.
 

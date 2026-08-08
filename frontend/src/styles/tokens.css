@@ -89,6 +89,18 @@
   --status-critical-ink:  #911F1E;
   --status-critical-wash: #FAE7E7;
 
+  /* ---- Diverging pair (signed effects) --------------------------------- */
+  /* Two hues that read as OPPOSITE plus a neutral midpoint, which is what a
+     signed quantity needs -- the sequential teal ramp cannot express a sign.
+     blue <-> orange is warm/cool and validated all-pairs in both modes
+     (CVD dE 24.7 light / 26.8 dark). The midpoint is grey on purpose: at zero
+     effect the mark must read as "nothing", which a hue cannot do. */
+  --div-neg:      #2A78D6;  /* effect pushes cases DOWN */
+  --div-neg-wash: #D8E6F8;
+  --div-pos:      #EB6834;  /* effect pushes cases UP */
+  --div-pos-wash: #FBE2D6;
+  --div-mid:      #C6CFC3;  /* zero / not distinguishable from zero */
+
   /* ---- Sequential ramp (single hue, light -> dark) --------------------- */
   --seq-100: #D7EEEA;
   --seq-200: #AFDDD7;
@@ -195,7 +207,19 @@
     --status-critical-ink:  #EF8080;
     --status-critical-wash: rgba(208, 59, 59, 0.20);
 
-    --seq-100: #10312D;
+    --div-neg:      #3987E5;
+    --div-neg-wash: rgba(57, 135, 229, 0.18);
+    --div-pos:      #D95926;
+    --div-pos-wash: rgba(217, 89, 38, 0.18);
+    --div-mid:      #39423F;
+
+    --div-neg:      #3987E5;
+  --div-neg-wash: rgba(57, 135, 229, 0.18);
+  --div-pos:      #D95926;
+  --div-pos-wash: rgba(217, 89, 38, 0.18);
+  --div-mid:      #39423F;
+
+  --seq-100: #10312D;
     --seq-200: #124840;
     --seq-300: #135F54;
     --seq-400: #17786A;

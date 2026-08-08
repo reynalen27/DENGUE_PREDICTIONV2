@@ -8,6 +8,9 @@ import Forecast from './pages/Forecast.jsx'
 import ModelComparison from './pages/ModelComparison.jsx'
 import Alerts from './pages/Alerts.jsx'
 import RiskMap from './pages/RiskMap.jsx'
+import Calibration from './pages/Calibration.jsx'
+import Drivers from './pages/Drivers.jsx'
+import Mathematics from './pages/Mathematics.jsx'
 
 export default function App() {
   return (
@@ -19,6 +22,9 @@ export default function App() {
         <Route path="/data" element={<DataManagement />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/map" element={<RiskMap />} />
+        <Route path="/calibration" element={<Calibration />} />
+        <Route path="/drivers" element={<Drivers />} />
+        <Route path="/mathematics" element={<Mathematics />} />
         <Route
           path="*"
           element={(

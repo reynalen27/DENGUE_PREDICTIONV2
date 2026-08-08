@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useFetch } from '../hooks/useFetch.js'
 import { modelsApi } from '../services/api.js'
 import { Card, CardBody, CardFoot, CardHead } from '../components/Card.jsx'
+import EvaluationBanner from '../components/EvaluationBanner.jsx'
 import { LegendItem, PageHeader, ViewToggle } from '../components/Controls.jsx'
 import { AsyncSection, EmptyState, SkeletonRows } from '../components/States.jsx'
 import DataTable from '../components/DataTable.jsx'
@@ -16,13 +18,34 @@ import { formatDateTime, formatNumber, toNumber } from '../lib/format.js'
  * metric, each with its own scale, the three models keeping their colour
  * across all five.
  */
-const METRICS = [
-  { key: 'rmse', name: 'RMSE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Root mean squared error, in cases.' },
-  { key: 'mae', name: 'MAE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Mean absolute error, in cases.' },
-  { key: 'mape', name: 'MAPE', goal: 'lower is better', decimals: 2, unit: '%', blurb: 'Mean absolute percentage error.' },
-  { key: 'crps', name: 'CRPS', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Continuous ranked probability score — scores the whole predictive distribution, not just the point estimate.' },
-  { key: 'coverage', name: 'Interval coverage', goal: 'higher is better', decimals: 1, unit: '%', blurb: 'Share of observations that fell inside the model’s stated interval.' },
+/*
+ * The objective asks two separate questions, so the page answers them
+ * separately rather than in one undifferentiated table:
+ *
+ *   1. point accuracy   - is the forecast close?      RMSE / MAE / MAPE
+ *   2. probabilistic    - is the UNCERTAINTY honest?  CRPS / coverage / sharpness
+ *
+ * A model can win outright on (1) and be useless on (2), which is exactly the
+ * accuracy-vs-calibration gap the study exists to address. Merging them into
+ * one ranking hides that.
+ *
+ * Within each group these are still small multiples: five metrics on five
+ * different scales cannot share a y-axis without inventing a relationship.
+ */
+const POINT_METRICS = [
+  { key: 'rmse', name: 'RMSE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Root mean squared error, in cases. Punishes large misses hardest.' },
+  { key: 'mae', name: 'MAE', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Mean absolute error, in cases. Treats every miss proportionally.' },
+  { key: 'mape', name: 'MAPE', goal: 'lower is better', decimals: 2, unit: '%', blurb: 'Mean absolute percentage error — scale-free, so it compares across regions of very different size.' },
 ]
+
+const PROB_METRICS = [
+  { key: 'crps', name: 'CRPS', goal: 'lower is better', decimals: 2, unit: '', blurb: 'Continuous ranked probability score — scores the whole predictive distribution, not just the point estimate. A point forecast cannot compete here.' },
+  { key: 'coverage', name: 'Interval coverage', goal: 'higher is better', decimals: 1, unit: '%', blurb: 'Share of observations that fell inside the stated interval. Should land ON the nominal level, not above it.' },
+  { key: 'mean_interval_width', name: 'Interval width', goal: 'lower is better', decimals: 1, unit: '', blurb: 'Sharpness. Read this together with coverage — an interval wide enough to contain everything covers perfectly and decides nothing.' },
+]
+
+const METRICS = [...POINT_METRICS, ...PROB_METRICS]
+
 
 function bestIdFor(metric, runs) {
   const scored = runs
@@ -132,6 +155,8 @@ export default function ModelComparison() {
         actions={<ViewToggle view={view} onChange={setView} label="Comparison view" />}
       />
 
+      <EvaluationBanner run={best} />
+
       <AsyncSection
         loading={loading}
         error={error}
@@ -181,8 +206,32 @@ export default function ModelComparison() {
                 return <LegendItem key={id} shape="swatch" color={colorFor(id)} label={run.model_type} />
               })}
             </div>
+
+            <div className="section-gap">
+              <h2 className="group-title">1 &middot; Point accuracy</h2>
+              <p className="group-sub">
+                How close the forecast lands. This is the comparison the first
+                objective asks for, and all three models can be scored on it.
+              </p>
+            </div>
             <div className="grid grid-3 section-gap">
-              {METRICS.map((metric) => (
+              {POINT_METRICS.map((metric) => (
+                <MetricChart key={metric.key} metric={metric} runs={list} colorFor={colorFor} />
+              ))}
+            </div>
+
+            <div className="section-gap">
+              <h2 className="group-title">2 &middot; Uncertainty and calibration</h2>
+              <p className="group-sub">
+                Whether the stated uncertainty is honest. A model can win on
+                point accuracy and still be badly calibrated here — that gap is
+                what the hybrid exists to close. Coverage and width must be read
+                together.{' '}
+                <Link to="/calibration">See the full calibration evidence →</Link>
+              </p>
+            </div>
+            <div className="grid grid-3 section-gap">
+              {PROB_METRICS.map((metric) => (
                 <MetricChart key={metric.key} metric={metric} runs={list} colorFor={colorFor} />
               ))}
             </div>
@@ -224,7 +273,9 @@ export default function ModelComparison() {
               ]}
             />
             <CardFoot>
-              RMSE, MAE, MAPE and CRPS are lower-is-better; interval coverage is higher-is-better.
+              RMSE, MAE, MAPE, CRPS and interval width are lower-is-better; interval coverage
+              should land <em>on</em> its nominal level rather than as high as possible — see
+              the <Link to="/calibration">calibration page</Link>.
             </CardFoot>
           </Card>
         )}

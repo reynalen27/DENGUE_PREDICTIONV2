@@ -9,10 +9,16 @@ import { useMemo, useRef, useState } from 'react'
  * equirectangular projection with a cos(lat) width correction is accurate to
  * well under a pixel — a real projection would be ceremony.
  *
- * Colour is a SEQUENTIAL encoding (magnitude): one hue, light to dark, six
- * bins. Bins are computed once across every year on screen so switching year
- * shows real change rather than a repainted scale. "No data" is deliberately
- * outside the ramp — absence is not a low value.
+ * Colour is a SEQUENTIAL encoding (magnitude) by default: one hue, light to
+ * dark, six bins. Bins are computed once across every year on screen so
+ * switching year shows real change rather than a repainted scale. "No data" is
+ * deliberately outside the ramp — absence is not a low value.
+ *
+ * Pass `fillOf` to opt out of that and colour by category instead. Risk level
+ * is the case that needs it: it is an ordinal STATUS, not a magnitude, and it
+ * wears the reserved green→red status scale. Quantile bins would be wrong
+ * there twice over — they would invent gradations inside "severe" and force a
+ * fixed share of regions into each level regardless of the actual levels.
  */
 
 const RAMP = ['--seq-100', '--seq-200', '--seq-300', '--seq-400', '--seq-500', '--seq-600']
@@ -64,11 +70,30 @@ function binOf(value, edges) {
   return i
 }
 
+/*
+ * A stable, unique identity per feature.
+ *
+ * This has to work across two boundary files with different property sets:
+ * the national layer carries `slug`, the municipal one carries
+ * `province` + `key` (and needs both — there are two Rosarios). Falling back
+ * to the array index would be wrong for reconciliation but is still better
+ * than a duplicate: an earlier version keyed on `province-key`, which for the
+ * national layer evaluated to "undefined-undefined" for all 17 features, so
+ * React could not tell them apart and 16 stale paths survived a scope switch.
+ */
+const featureKey = (f, i) => {
+  const p = f.properties ?? {}
+  if (p.slug) return `slug:${p.slug}`
+  if (p.key) return `lgu:${p.province ?? ''}:${p.key}`
+  return `idx:${i}`
+}
+
 export default function Choropleth({
   features,
   bbox,
   valueOf,
   bins,
+  fillOf,            // (feature) => css colour; overrides the sequential ramp
   formatValue,
   renderTooltip,
   ariaLabel,
@@ -76,16 +101,17 @@ export default function Choropleth({
 }) {
   const wrapRef = useRef(null)
   const [hovered, setHovered] = useState(null)
+  const [hoveredId, setHoveredId] = useState(null)
   const [tipPos, setTipPos] = useState({ x: 0, y: 0 })
 
   const proj = useMemo(() => project(bbox), [bbox])
 
   const paths = useMemo(
-    () => features.map((f) => ({ feature: f, d: pathFor(f.geometry, proj.point) })),
+    () => features.map((f, i) => ({ feature: f, id: featureKey(f, i), d: pathFor(f.geometry, proj.point) })),
     [features, proj],
   )
 
-  const show = (feature, e) => {
+  const show = (feature, id, e) => {
     const box = wrapRef.current?.getBoundingClientRect()
     if (box) {
       const cx = e.clientX ?? (e.target.getBoundingClientRect().left + e.target.getBoundingClientRect().width / 2)
@@ -93,6 +119,7 @@ export default function Choropleth({
       setTipPos({ x: cx - box.left, y: cy - box.top })
     }
     setHovered(feature)
+    setHoveredId(id)
   }
 
   // CALABARZON is almost square, so a fixed height inside a wide card would
@@ -113,15 +140,16 @@ export default function Choropleth({
         preserveAspectRatio="xMidYMid meet"
       >
         <g>
-          {paths.map(({ feature, d }) => {
+          {paths.map(({ feature, id, d }) => {
             const value = valueOf(feature)
             const i = binOf(value, bins)
-            const fill = i === -1 ? 'var(--surface-3)' : `var(${RAMP[Math.min(i, RAMP.length - 1)]})`
-            const active = hovered?.properties.key === feature.properties.key
-              && hovered?.properties.province === feature.properties.province
+            const fill = fillOf
+              ? fillOf(feature)
+              : i === -1 ? 'var(--surface-3)' : `var(${RAMP[Math.min(i, RAMP.length - 1)]})`
+            const active = hoveredId === id
             return (
               <path
-                key={`${feature.properties.province}-${feature.properties.key}`}
+                key={id}
                 d={d}
                 fill={fill}
                 // A hairline in the surface colour separates neighbours; it is
@@ -132,11 +160,14 @@ export default function Choropleth({
                 vectorEffect="non-scaling-stroke"
                 tabIndex={0}
                 role="button"
-                aria-label={`${feature.properties.name}, ${feature.properties.province}: ${formatValue(value)}`}
-                onMouseMove={(e) => show(feature, e)}
-                onMouseLeave={() => setHovered(null)}
-                onFocus={(e) => show(feature, e)}
-                onBlur={() => setHovered(null)}
+                // The two layers carry different secondary labels — province
+                // for a municipality, slug for a region — so neither is assumed.
+                aria-label={[feature.properties.name, feature.properties.province]
+                  .filter(Boolean).join(', ') + `: ${formatValue(value)}`}
+                onMouseMove={(e) => show(feature, id, e)}
+                onMouseLeave={() => { setHovered(null); setHoveredId(null) }}
+                onFocus={(e) => show(feature, id, e)}
+                onBlur={() => { setHovered(null); setHoveredId(null) }}
                 style={{ cursor: 'pointer', outline: 'none' }}
               />
             )

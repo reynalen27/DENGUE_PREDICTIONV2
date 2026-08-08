@@ -21,9 +21,11 @@ import { fileURLToPath } from 'node:url'
 import { pool } from '../src/config/db.js'
 import { readGazetteer } from './etl/sources.js'
 import { normKey } from './etl/normalize.js'
+import { REGIONS, REGION_SLUGS, canonRegion } from './etl/regions-ph.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(HERE, '..', '..', 'frontend', 'public', 'calabarzon-lgus.geojson')
+const OUT_ADM1 = path.join(HERE, '..', '..', 'frontend', 'public', 'ph-regions.geojson')
 const CACHE = path.join(HERE, '.cache')
 
 const API = 'https://www.geoboundaries.org/api/current/gbOpen/PHL'
@@ -89,35 +91,70 @@ function representativePoint(geometry) {
   return [x / area, y / area]
 }
 
-/** Douglas-Peucker. `eps` is in degrees; 0.001 deg is roughly 110 m. */
-function simplifyRing(points, eps) {
-  if (points.length <= 4) return points
-  const keep = new Uint8Array(points.length)
-  keep[0] = 1
-  keep[points.length - 1] = 1
+/**
+ * Douglas-Peucker over an OPEN polyline. `eps` is in degrees; 0.001 is ~110 m.
+ */
+function simplifyOpen(points, eps, keep, offset) {
   const stack = [[0, points.length - 1]]
-
   while (stack.length) {
     const [first, last] = stack.pop()
-    let maxD = 0
-    let idx = 0
+    if (last <= first + 1) continue
     const [x1, y1] = points[first]
     const [x2, y2] = points[last]
     const dx = x2 - x1
     const dy = y2 - y1
-    const denom = Math.hypot(dx, dy) || 1
+    const denom = Math.hypot(dx, dy)
+    let maxD = -1
+    let idx = -1
     for (let i = first + 1; i < last; i += 1) {
       const [px, py] = points[i]
-      const d = Math.abs(dy * px - dx * py + x2 * y1 - y2 * x1) / denom
+      // Degenerate baseline (identical endpoints): fall back to radial distance,
+      // otherwise every point measures zero and the segment never splits.
+      const d = denom === 0
+        ? Math.hypot(px - x1, py - y1)
+        : Math.abs(dy * px - dx * py + x2 * y1 - y2 * x1) / denom
       if (d > maxD) { maxD = d; idx = i }
     }
-    if (maxD > eps) {
-      keep[idx] = 1
+    if (maxD > eps && idx !== -1) {
+      keep[offset + idx] = 1
       stack.push([first, idx], [idx, last])
     }
   }
+}
+
+/**
+ * Douglas-Peucker for a CLOSED ring.
+ *
+ * A ring's first and last point are identical, so running plain DP on it
+ * degenerates: the initial baseline has zero length, every perpendicular
+ * distance measures 0, nothing clears eps, and the ring comes back untouched.
+ * That is why an earlier version of this script appeared to simplify nothing
+ * and the output was ~4x larger than it needed to be.
+ *
+ * The fix is the standard one: anchor on the vertex farthest from the start,
+ * which splits the ring into two open polylines, and simplify each.
+ */
+function simplifyRing(points, eps) {
+  if (points.length <= 5) return points
+
+  const n = points.length - 1          // drop the duplicated closing vertex
+  const keep = new Uint8Array(points.length)
+  keep[0] = 1
+  keep[points.length - 1] = 1
+
+  let far = 1
+  let farD = -1
+  for (let i = 1; i < n; i += 1) {
+    const d = Math.hypot(points[i][0] - points[0][0], points[i][1] - points[0][1])
+    if (d > farD) { farD = d; far = i }
+  }
+  keep[far] = 1
+
+  simplifyOpen(points.slice(0, far + 1), eps, keep, 0)
+  simplifyOpen(points.slice(far, n + 1), eps, keep, far)
 
   const out = points.filter((_, i) => keep[i])
+  // A ring needs 4 points to enclose area; below that, keep the original.
   return out.length >= 4 ? out : points
 }
 
@@ -172,7 +209,88 @@ async function fetchLayer(level) {
   return JSON.parse(text)
 }
 
+/**
+ * The national layer: the 17 administrative regions that are the study's unit
+ * of analysis. Same open source, same one-time build, same static output — the
+ * app still makes no request to a tile server at runtime.
+ *
+ * geoBoundaries ADM1 has its own naming again ("Autonomous Region In Muslim
+ * Mindanao", "Region I"), so canonRegion() from the ETL does the matching here
+ * too rather than a second lookup table drifting out of sync with it.
+ */
+async function buildRegions() {
+  log('\nBuilding the national ADM1 layer (17 regions)\n')
+  const adm1 = await fetchLayer('ADM1')
+
+  const bySlug = new Map()
+  const unmatched = []
+  for (const f of adm1.features) {
+    const slug = canonRegion(f.properties.shapeName)
+    if (!slug) { unmatched.push(f.properties.shapeName); continue }
+    if (!bySlug.has(slug)) bySlug.set(slug, f)
+  }
+
+  log(`  matched ${bySlug.size}/17 regions`)
+  if (unmatched.length) log(`  unmatched ADM1 shapes: ${unmatched.join(', ')}`)
+
+  const missing = REGION_SLUGS.filter((s) => !bySlug.has(s))
+  if (missing.length) {
+    throw new Error(`No ADM1 boundary for: ${missing.join(', ')}. Refusing to write a partial map.`)
+  }
+
+  let before = 0
+  let after = 0
+  const features = []
+  for (const { slug, name } of REGIONS) {
+    const f = bySlug.get(slug)
+    before += countPoints(f.geometry)
+    // Coarser than the municipal layer: these shapes render far smaller on
+    // screen, so the extra vertices are invisible weight.
+    const geometry = simplifyGeometry(f.geometry, 0.006, 3)
+    after += countPoints(geometry)
+    const pt = representativePoint(f.geometry)
+    features.push({
+      type: 'Feature',
+      properties: { slug, name, lng: round(pt[0], 5), lat: round(pt[1], 5) },
+      geometry,
+    })
+  }
+
+  const bbox = features.reduce((b, f) => {
+    const walk = (c) => {
+      if (typeof c[0] === 'number') {
+        b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1])
+        b[2] = Math.max(b[2], c[0]); b[3] = Math.max(b[3], c[1])
+      } else c.forEach(walk)
+    }
+    walk(f.geometry.coordinates)
+    return b
+  }, [180, 90, -180, -90]).map((n) => round(n, 4))
+
+  fs.mkdirSync(path.dirname(OUT_ADM1), { recursive: true })
+  fs.writeFileSync(OUT_ADM1, JSON.stringify({
+    type: 'FeatureCollection',
+    bbox,
+    metadata: {
+      source: 'geoBoundaries gbOpen PHL ADM1',
+      sourceUrl: 'https://www.geoboundaries.org/',
+      licence: 'CC-BY 4.0',
+      boundaryYear: 2020,
+      generatedBy: 'backend/scripts/build-boundaries.js',
+    },
+    features,
+  }))
+
+  const kb = (fs.statSync(OUT_ADM1).size / 1024).toFixed(0)
+  log(`  ${after.toLocaleString()} points (from ${before.toLocaleString()},`
+    + ` ${((1 - after / before) * 100).toFixed(0)}% smaller)`)
+  log(`  bbox ${bbox.join(', ')}`)
+  log(`  wrote ${path.relative(process.cwd(), OUT_ADM1)}  (${kb} kB)`)
+}
+
 async function main() {
+  await buildRegions()
+
   log('\nBuilding CALABARZON boundaries from geoBoundaries (gbOpen, CC-BY 4.0)\n')
 
   const adm2 = await fetchLayer('ADM2')

@@ -157,6 +157,26 @@ duplicate and blank rows) and two it cannot. The reasoning behind each is in
 
 Both commands are idempotent. Re-running `npm run etl` upserts.
 
+### If `npm run migrate` says "baseline"
+
+That is expected on a database created before the versioned migration runner
+existed. It records `001_initial_schema.sql` as already applied — because its
+tables demonstrably exist — and then applies anything newer. Re-running
+`npm run migrate` at any time is safe; the `schema_migrations` table is the
+ledger.
+
+### Duplicate rows after running `npm run seed` twice
+
+`seed.js` is not yet idempotent, so a second run duplicates the demo regions
+and model runs (the Model comparison page then shows 6 rows instead of 3).
+To inspect and clean:
+
+```bash
+npm run dedupe             # report only, changes nothing
+npm run dedupe -- --apply  # delete the duplicates
+```
+
+
 ## 8. Debugging the backend in VS Code
 
 Go to **Run and Debug** (`Ctrl+Shift+D`) → select **Debug backend (Node + MySQL)**

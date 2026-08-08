@@ -3,13 +3,14 @@ import {
   Area, CartesianGrid, ComposedChart, Line, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useFetch } from '../hooks/useFetch.js'
-import { alertsApi, casesApi, predictionsApi, regionsApi } from '../services/api.js'
+import { alertsApi, casesApi, panelApi, predictionsApi, regionsApi } from '../services/api.js'
 import { Card, CardBody, CardHead } from '../components/Card.jsx'
 import { LegendItem, PageHeader, Select, ViewToggle } from '../components/Controls.jsx'
 import { AsyncSection, EmptyState, SkeletonBlock } from '../components/States.jsx'
 import ChartTooltip from '../components/ChartTooltip.jsx'
 import DataTable from '../components/DataTable.jsx'
 import StatCard from '../components/StatCard.jsx'
+import CorrelationPanel from '../components/CorrelationPanel.jsx'
 import Icon from '../components/Icon.jsx'
 import { useChartTheme } from '../lib/useChartTheme.js'
 import { dayKey, formatDate, formatInt, formatNumber, riskRank, toNumber } from '../lib/format.js'
@@ -53,8 +54,9 @@ export default function Forecast() {
   const t = useChartTheme()
   const [regionId, setRegionId] = useState(null)
   const [view, setView] = useState('chart')
+  const [tab, setTab] = useState('forecast')
 
-  const { data: regions, loading: regionsLoading } = useFetch(() => regionsApi.list(), [])
+  const { data: regions, loading: regionsLoading } = useFetch(() => regionsApi.list('region'), [])
   const { data: alerts } = useFetch(() => alertsApi.list(), [])
 
   /*
@@ -86,6 +88,11 @@ export default function Forecast() {
     [activeRegionId],
   )
 
+  // The whole 17-region panel: the correlation tab needs every region for its
+  // between-region view, not just the selected one.
+  const { data: panel, loading: panelLoading, error: panelError, refetch: refetchPanel } =
+    useFetch(() => panelApi.get(), [])
+
   const series = useMemo(() => mergeSeries(cases, predictions), [cases, predictions])
   const forecastPoints = series.filter((d) => d.forecast !== null)
   const observedPoints = series.filter((d) => d.observed !== null)
@@ -99,15 +106,21 @@ export default function Forecast() {
     ? forecastPoints.reduce((sum, d) => sum + ((d.upper ?? 0) - (d.lower ?? 0)), 0) / forecastPoints.length
     : null
 
-  const regionName = regions?.find((r) => String(r.id) === String(activeRegionId))?.name ?? 'Region'
+  const activeRegion = regions?.find((r) => String(r.id) === String(activeRegionId))
+  const regionName = activeRegion?.name ?? 'Region'
+  const activeSlug = activeRegion?.slug ?? null
 
   return (
     <>
       <PageHeader
         title="Forecast"
-        description="Weekly predicted cases from the Bayesian-neural hybrid model, shown with the credible interval the model reports alongside each point."
+        description={tab === 'forecast'
+          ? "Monthly predicted cases from the Bayesian-neural hybrid model, shown with the credible interval the model reports alongside each point."
+          : "How the recorded case burden relates to each region's climate and socioeconomic profile. Observed surveillance only — no model output on this tab."}
       />
 
+      {/* One selector, shared by both tabs — the brief's requirement, and it
+          only works because the whole app now runs on the same 17 regions. */}
       <div className="filter-bar">
         <span className="filter-bar-label">Region</span>
         <Select
@@ -116,15 +129,41 @@ export default function Forecast() {
           value={activeRegionId ?? ''}
           disabled={regionsLoading || !regions?.length}
           onChange={(v) => setRegionId(v)}
-          options={(regions ?? []).map((r) => ({ value: r.id, label: `${r.name} · ${r.region_code}` }))}
+          options={(regions ?? []).map((r) => ({ value: r.id, label: `${r.name} · ${r.slug}` }))}
         />
         <span className="filter-bar-spacer" />
-        <span className="tag">
-          <Icon name="clock" size={12} />
-          {hasForecast ? `${forecastPoints.length}-week horizon` : 'No horizon'}
-        </span>
+        {tab === 'forecast' && (
+          <span className="tag">
+            <Icon name="clock" size={12} />
+            {hasForecast ? `${forecastPoints.length}-month horizon` : 'No horizon'}
+          </span>
+        )}
       </div>
 
+      <div className="tabs" role="tablist" aria-label="Forecast views">
+        <button type="button" role="tab" aria-selected={tab === 'forecast'}
+          className={`tab ${tab === 'forecast' ? 'is-on' : ''}`} onClick={() => setTab('forecast')}>
+          <Icon name="forecast" size={15} />
+          Predicted cases
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'correlation'}
+          className={`tab ${tab === 'correlation' ? 'is-on' : ''}`} onClick={() => setTab('correlation')}>
+          <Icon name="chart" size={15} />
+          Correlations
+        </button>
+      </div>
+
+      {tab === 'correlation' ? (
+        <CorrelationPanel
+          panel={panel}
+          loading={panelLoading}
+          error={panelError}
+          refetch={refetchPanel}
+          activeSlug={activeSlug}
+          regionName={regionName}
+        />
+      ) : (
+      <>
       <div className="grid grid-4">
         <StatCard
           label="Peak predicted cases"
@@ -323,6 +362,8 @@ export default function Forecast() {
           )}
         </AsyncSection>
       </Card>
+      </>
+      )}
     </>
   )
 }

@@ -21,6 +21,9 @@ const NAV = [
     items: [
       { to: '/forecast', label: 'Forecast', icon: 'forecast' },
       { to: '/models', label: 'Model comparison', icon: 'models' },
+      { to: '/calibration', label: 'Calibration', icon: 'target' },
+      { to: '/drivers', label: 'Drivers', icon: 'chart' },
+      { to: '/mathematics', label: 'Mathematical calculation', icon: 'sigma' },
     ],
   },
   {
@@ -35,6 +38,9 @@ const TITLES = {
   '/alerts': 'Alerts',
   '/forecast': 'Forecast',
   '/models': 'Model comparison',
+  '/calibration': 'Calibration',
+  '/drivers': 'Drivers',
+  '/mathematics': 'Mathematical calculation',
   '/data': 'Data management',
 }
 

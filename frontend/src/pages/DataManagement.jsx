@@ -50,7 +50,7 @@ export default function DataManagement() {
   const [dragging, setDragging] = useState(false)
   const [upload, setUpload] = useState(null) // { state, fileName, count, message }
 
-  const { data: regions } = useFetch(() => regionsApi.list(), [])
+  const { data: regions } = useFetch(() => regionsApi.list('municipality'), [])
   const { data: cases, loading, error, refetch } = useFetch(() => casesApi.list(), [])
 
   const regionName = useMemo(() => {

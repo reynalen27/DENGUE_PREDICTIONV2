@@ -9,7 +9,10 @@
     "migrate": "node src/config/migrate.js",
     "seed": "node src/config/seed.js",
     "etl": "node scripts/import-research-data.js",
-    "etl:boundaries": "node scripts/build-boundaries.js"
+    "etl:boundaries": "node scripts/build-boundaries.js",
+    "dedupe": "node scripts/dedupe-seed-artifacts.js",
+    "etl:revised": "node scripts/import-revised-dataset.js",
+    "seed:fixtures": "node scripts/seed-model-fixtures.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

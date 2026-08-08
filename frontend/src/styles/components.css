@@ -1264,3 +1264,472 @@ select.input { padding-right: 30px; }
   .shell { grid-template-columns: 1fr; }
   .card { break-inside: avoid; box-shadow: none; }
 }
+
+/* Group heading inside a page — separates the two questions the model
+   comparison answers, without competing with the page title. */
+.group-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.group-sub {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  max-width: 80ch;
+}
+
+/* =========================================================================
+   Diverging effect bars (Drivers)
+   ========================================================================= */
+
+.effect-list { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.effect-row { display: flex; flex-direction: column; gap: 5px; }
+
+.effect-head { display: flex; align-items: baseline; gap: var(--sp-3); }
+
+.effect-name { font-size: var(--text-sm); font-weight: 550; }
+
+.effect-lag {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.effect-value {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.effect-track {
+  position: relative;
+  height: 18px;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+/* The zero line is the reference every bar is read against, so it sits under
+   the marks and stays visible through the credible-interval wash. */
+.effect-zero {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+/* The credible interval, drawn as a low-opacity band behind the point
+   estimate. Its width is the honest part of the picture. */
+.effect-ci {
+  position: absolute;
+  top: 5px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  opacity: 0.22;
+}
+
+.effect-fill {
+  position: absolute;
+  top: 3px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px solid transparent;
+}
+
+/* An effect whose interval spans zero is drawn hollow AND labelled. Never
+   colour alone -- the whole point is that this reads as "no finding". */
+.effect-fill.is-null {
+  border-style: dashed;
+  background: transparent !important;
+}
+
+.effect-null-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+
+/* =========================================================================
+   Mathematics page (draft)
+   ========================================================================= */
+
+.math-body { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.math-body p {
+  font-size: var(--text-md);
+  line-height: 1.65;
+  color: var(--ink-2);
+  max-width: 78ch;
+}
+
+.math-body strong { color: var(--ink-1); font-weight: 600; }
+
+/* ---- Formulas -------------------------------------------------------- */
+
+.formula {
+  margin: 0;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  /* Long formulas scroll inside their own box; the page never scrolls sideways. */
+  overflow-x: auto;
+}
+
+.formula-math math {
+  font-size: 1.15rem;
+  color: var(--ink-1);
+}
+
+/* MathML inherits the page font unless told otherwise; a serif italic is the
+   convention for variables and makes them read as maths, not as prose. */
+.formula-math math mi { font-family: 'Times New Roman', Times, serif; font-style: italic; }
+.formula-math math mn,
+.formula-math math mo { font-family: 'Times New Roman', Times, serif; }
+.formula-math math mtext { font-family: var(--font-sans); font-size: 0.82em; }
+
+.formula-caption {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-grid);
+}
+
+.formula-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.formula-note { font-size: var(--text-xs); color: var(--ink-3); }
+
+.formula-inline math { font-size: 1em; color: inherit; }
+
+/* ---- "What this changes" --------------------------------------------- */
+
+.math-changes {
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--accent-wash);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+.math-changes-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.math-changes p {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--ink-1);
+  max-width: 78ch;
+}
+
+.math-callout {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-3);
+  border-radius: var(--r-md);
+  font-size: var(--text-md);
+}
+
+/* ---- The processing chain -------------------------------------------- */
+
+.math-chain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.math-chain li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.math-chain-step {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Step 3 is the only one this repo does not own. */
+.math-chain-step.is-model {
+  background: var(--accent-solid);
+  color: var(--on-accent-solid);
+}
+
+.math-chain-text { display: flex; flex-direction: column; min-width: 0; }
+.math-chain-text strong { font-size: var(--text-md); font-weight: 600; }
+.math-chain-text span { font-size: var(--text-xs); color: var(--ink-3); }
+
+/* ---- Lead-time table -------------------------------------------------- */
+
+.math-leadtime { display: flex; flex-direction: column; gap: 3px; }
+
+.lt-row {
+  display: grid;
+  grid-template-columns: 42px 62px 1fr 68px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.lt-month { font-size: var(--text-xs); color: var(--ink-2); }
+
+.lt-temp {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+/* The temperature that precedes the case peak, and the peak itself. Both are
+   labelled in the prose beneath — the colour is a second channel, not the
+   only one. */
+.lt-temp.is-peak { color: var(--div-pos); font-weight: 650; }
+
+.lt-bar-track {
+  height: 14px;
+  background: var(--surface-3);
+  border-radius: var(--r-pill);
+}
+
+.lt-bar {
+  display: block;
+  height: 14px;
+  min-width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--seq-400);
+}
+
+.lt-bar.is-peak { background: var(--seq-600); }
+
+.lt-cases {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Column labels share the data rows' grid so each sits over its own column.
+   An earlier 2-column version wrapped and drifted out of alignment. */
+.lt-head {
+  display: grid;
+  grid-template-columns: 42px 62px 1fr 68px;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: 6px;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line-grid);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.lt-head-temp { text-align: right; }
+
+@media (max-width: 620px) {
+  .lt-row,
+  .lt-head { grid-template-columns: 34px 54px 1fr 56px; gap: var(--sp-2); }
+}
+
+/* =========================================================================
+   Tabs (Forecast)
+   ========================================================================= */
+
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px var(--sp-4);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.tab:hover { color: var(--ink-1); }
+
+/* The rule, not just colour, marks the active tab. */
+.tab.is-on {
+  color: var(--ink-1);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* ---- Scatter ---------------------------------------------------------- */
+
+.scatter { width: 100%; }
+
+.scatter-foot {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-grid);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.scatter-r { font-weight: 650; color: var(--ink-2); }
+.scatter-r.is-strong { color: var(--accent-ink); }
+.scatter-hover { margin-left: auto; color: var(--ink-1); font-weight: 550; }
+
+/* ---- Lag picker -------------------------------------------------------- */
+
+.lag-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+
+.lag-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.lag-chip:hover { border-color: var(--line-strong); }
+
+.lag-chip.is-on {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* r beside each lag, so the strongest offset is visible rather than assumed. */
+.lag-chip-r {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.lag-note { font-size: var(--text-2xs); color: var(--ink-3); margin-left: var(--sp-2); }
+
+/* =========================================================================
+   Risk map (Alerts)
+   ========================================================================= */
+
+/* Map beside its legend at desk width; stacked below. The map column is
+   `minmax(0, 1fr)` so the SVG can shrink — `1fr` alone would let its intrinsic
+   width push the legend off the card. */
+.risk-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+.risk-map-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-top: var(--sp-2);
+}
+
+.risk-map-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.risk-map-hint svg { flex: none; margin-top: 1px; }
+
+.risk-legend { display: flex; flex-direction: column; gap: 2px; }
+
+.risk-legend-step {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 0;
+}
+
+/* Square, not a dot: it stands for an area on the map, and matching the shape
+   makes the mapping legible without a caption. */
+.risk-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+.risk-legend-name { font-size: var(--text-sm); color: var(--ink-2); }
+
+.risk-legend-count {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--ink-1);
+}
+
+@media (max-width: 900px) {
+  .risk-map-layout { grid-template-columns: minmax(0, 1fr); }
+  .risk-map-side { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-5); }
+  .risk-legend { flex-direction: row; flex-wrap: wrap; gap: var(--sp-4); }
+  .risk-legend .map-legend-label { width: 100%; }
+  .risk-legend-step { grid-template-columns: 14px auto auto; }
+  .risk-map-hint { flex: 1 1 220px; }
+}
