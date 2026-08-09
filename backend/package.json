@@ -12,7 +12,11 @@
     "etl:boundaries": "node scripts/build-boundaries.js",
     "dedupe": "node scripts/dedupe-seed-artifacts.js",
     "etl:revised": "node scripts/import-revised-dataset.js",
-    "seed:fixtures": "node scripts/seed-model-fixtures.js"
+    "seed:fixtures": "node scripts/seed-model-fixtures.js",
+    "forecast": "cd ../python_service && python3 main.py",
+    "forecast:hybrid": "cd ../python_service && python3 -c \"from models import HybridModel; from database import DatabaseConnector; exec(open('main.py').read())\"",
+    "models:run": "cd ../python_service && source venv/bin/activate && python3 main.py",
+    "predictions:refresh": "npm run forecast && npm run dev"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
